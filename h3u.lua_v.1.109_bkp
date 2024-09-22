@@ -2,7 +2,7 @@
 -- my personal utilities
 -- author: H3Chr
 h3u = {}
-h3u.version = 1.111
+h3u.version = 1.110
 h3u.updateCount = 0
 h3u.isUpdateError = false
 h3u.updater = function(throwWhenUpdateError)
@@ -71,7 +71,7 @@ function h3u.bool2num(boolean)
 end
 
 
-h3u.funcDummy = function(x)
+h3u.funcDummy = function(lengthMxeter)
     return x
 end
 
@@ -434,16 +434,6 @@ function h3u.colorMixHSV(color1Rgbm, color2Rgbm, mix, hueDirection)
     return colorMixHsv:rgb():rgbm(newM)
 end
 
-function h3u.drawLineDashed(pStart, pEnd, div, interval_r, color, thickness)
-    local p_diff = pEnd - pStart
-    local p_step = p_diff/div
-    local duty = 1 - interval_r*(div - 1)/p_diff:length()
-    for i = 0, div - 1 do
-        local p1 = pStart + i*p_step/(1 - interval_r/p_diff:length())
-        local p2 = p1 + 1*p_step*duty -- interval*vec2(1, 0)
-        ui.drawLine(p1, p2, color, thickness)
-    end
-end
 function h3u.dwriteTextAlignedCompressed(text, fontSize, horizontalAligment, verticalAlignment, size, allowWordWrapping, color)
     local cur = ui.getCursor()
     ui.dwriteText(text, fontSize, rgbm(0, 0, 0, 0))
@@ -457,85 +447,25 @@ function h3u.dwriteTextAlignedCompressed(text, fontSize, horizontalAligment, ver
     end
 end
 
-function h3u.drawDwriteTextCurved(str, fontSize, color, center, radius, startangleDeg, endangleDeg, mode)
+function h3u.drawDwriteTextCurved(str, size, color, center, radius, startangle, endangle, mode)
     for i = 0, string.len(str) do
         local angle_deg
-        local angle_gain = (endangleDeg - startangleDeg)/(string.len(str)-0.5)
+        local angle_gain = (endangle - startangle)/(string.len(str)-0.5)
         if mode == 1 then
-            angle_deg = startangleDeg + (i-0.5)*angle_gain
+            angle_deg = startangle + (i-0.5)*angle_gain
         else
-            angle_deg = -180 - startangleDeg - (i-0.5)*angle_gain
+            angle_deg = -180 - startangle - (i-0.5)*angle_gain
         end
         local arc = radius*vec2(math.cos(math.rad(angle_deg)), math.sin(math.rad(angle_deg)))
         ui.beginRotation()
         if mode == 1 then
-            ui.dwriteDrawText(string.sub(str, i, i), fontSize, center + vec2(0, radius) - 0.5*fontSize, color)
+            ui.dwriteDrawText(string.sub(str, i, i), size, center + vec2(0, radius) - 0.5*size, color)
         else
-            ui.dwriteDrawText(string.sub(str, i, i), fontSize, center + vec2(0, -radius) - 0.5*fontSize, color)
+            ui.dwriteDrawText(string.sub(str, i, i), size, center + vec2(0, -radius) - 0.5*size, color)
         end
         ui.endPivotRotation(angle_deg, center, vec2(0, 0))
     end
 end
-
---_lDivMathPi
-h3u.tblClothoidX = {}
-h3u.tblClothoidY = {}
-h3u.clothoidXSum = 0
-h3u.clothoidYSum = 0
-h3u.clothoidTblStep = 0.03*math.pi
-for theta = 0, math.pi, h3u.clothoidTblStep do
-    h3u.tblClothoidX[#h3u.tblClothoidX + 1] = {theta, h3u.clothoidXSum}
-    h3u.tblClothoidY[#h3u.tblClothoidY + 1] = {theta, h3u.clothoidYSum}
-    h3u.clothoidXSum = h3u.clothoidXSum + math.cos(0.5*(theta^2))*h3u.clothoidTblStep
-    h3u.clothoidYSum = h3u.clothoidYSum + math.sin(0.5*(theta^2))*h3u.clothoidTblStep
-end
-h3u.pathClothoidArc = function(center, radius, angleFrom, angleTo, angleDurationTrueArc, numSegments)
-    local angleDurTotal = angleTo - angleFrom
-    local segsTrueArc = math.round(angleDurationTrueArc/angleDurTotal*numSegments)
-
-    local angleClothoid1Dur = 0.5*(angleDurTotal - angleDurationTrueArc)
-    local angleClothoid1From = angleFrom
-    local angleClothoid1To = angleFrom + angleClothoid1Dur
-    local segsClothoid1 = math.round(angleClothoid1Dur/angleDurTotal*numSegments)
-    local lClothoid1 = math.sqrt(2*angleClothoid1Dur)
-
-    local angleClothoid2Dur = 0.5*(angleDurTotal - angleDurationTrueArc)
-    local angleClothoid2From = angleTo - angleClothoid2Dur
-    local angleClothoid2To = angleTo
-    local segsClothoid2 = math.round(angleClothoid2Dur/angleDurTotal*numSegments)
-    local lClothoid2 = math.sqrt(2*angleClothoid2Dur)
-
-    -- for theta = 0, math.pi, 0.01*math.pi do
-    --     ui.pathLineTo(center + 100*vec2(h3u.calcLut(h3u.tblClothoidX, theta), h3u.calcLut(h3u.tblClothoidY, theta)))
-    -- end
-    -- ac.log(segsClothoid1)
-    local function clothoidV(t, angle, vec2Gain)
-        vec2Gain = vec2Gain or vec2(1, 1)
-        return h3u.rotateVec2(vec2Gain*vec2(h3u.calcLut(h3u.tblClothoidX, t), h3u.calcLut(h3u.tblClothoidY, t)), angle - 0.5*math.pi)
-    end
-    local posTrueArcFrom = radius*vec2(math.cos(angleClothoid1To), math.sin(angleClothoid1To))
-    local posTrueArcTo = radius*vec2(math.cos(angleClothoid2From), math.sin(angleClothoid2From))
-
-    local posOffset = posTrueArcFrom - radius*lClothoid1*clothoidV(lClothoid1, -angleClothoid1From)
-    for seg = 0, segsClothoid1 do
-        local segN = seg/segsClothoid1
-        local t = math.lerp(0, lClothoid1, segN)
-        ui.pathLineTo(center + posOffset + radius*lClothoid1*clothoidV(t, -angleClothoid1From))
-    end
-    for seg = 0, segsTrueArc do
-        local segN = seg/segsTrueArc
-        local a = math.lerp(angleClothoid1To, angleClothoid2From, segN)
-        local v = vec2(math.cos(a), math.sin(a))
-        ui.pathLineTo(center + radius*v)
-    end
-    posOffset = posTrueArcTo - radius*lClothoid2*clothoidV(lClothoid2, -angleClothoid2To, vec2(-1, 1))
-    for seg = segsClothoid2, 0, -1 do
-        local segN = seg/segsClothoid2
-        local t = math.lerp(0, lClothoid2, segN)
-        ui.pathLineTo(center + posOffset + radius*lClothoid2*clothoidV(t, -angleClothoid2To, vec2(-1, 1)))
-    end
-end
-
 
 
 function h3u.drawCMStyleTab(dt, pos, fontSize, listTabParent, isRightAlign, isSeparator, tblColors, useMouseWheel)
@@ -1149,26 +1079,23 @@ h3u.replayable.new = function(isInterpolate, valDefault)
         end
     end
     obj.update = function(self, value_notReplay)
-        if (not ac.getSim().isReplayActive) then -- live
-            local frame = ac.getSim().replayFrames
-            self.tblValue[frame + 1] = 1*value_notReplay
+        if (not sim.isReplayActive) then -- live
+            local frame = sim.replayFrames
+            self.tblValue[frame + 1] = value_notReplay
             self.tblRecordedF[#self.tblRecordedF + 1] = frame
             if (self.lastRecordedFrame < (frame - 1)) then -- frame loss
                 local rep = math.max(frame - self.lastRecordedFrame - 1, 0)
                 for i = 1, rep do
                     local mix = (i - 1)/rep
-                    self.tblValue[i + 1] = interpolate(self.tblValue[self.lastRecordedFrame + 1], 1*value_notReplay, mix)
+                    self.tblValue[i + 1] = interpolate(self.tblValue[self.lastRecordedFrame + 1], value_notReplay, mix)
                 end
             end
             self.lastRecordedFrame = frame
-            self.valOut = value_notReplay
-            return self.valOut
+            return value_notReplay
         else -- replay
-            local frame = ac.getSim().replayCurrentFrame
+            local frame = sim.replayCurrentFrame
             if (self.tblValue[frame + 1] ~= nil) then
                 self.valOut = self.tblValue[frame + 1]
-            else
-                self.valOut = valDefault
             end
             return self.valOut
         end

@@ -20,7 +20,7 @@ local n, loi
 local carPlayer = ac.getCar(0)
 function script.update(dt)
     local share_key_header = 'car'..sim.focusedCar..'.'
-    app.isAircraft = (ac.load(share_key_header..'isAircraft') == 'true') or false
+    app.isAircraft = (ac.load(share_key_header..'isAircraft') == 1) or false
     app.enginesCount = math.min(ac.load(share_key_header..'aircraftEnginesCount') or 1, app.throttleCountMax)
 
     local funIsAvailable = function(contIndex, contName, loi)
