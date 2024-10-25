@@ -567,9 +567,9 @@ function script.windowInstruments(dt)
             ui.endPivotRotation(math.deg(inst.roll) + 90, centerRef)
         end
         
-        lw = 0.01*rRef
+        lw = 0.02*rRef
         -- ui.beginTextureShade(inst.ecShadow)
-        ui.drawCircle(centerRef, r - 0.5*lw, rgbm(0, 0, 0, 0.5), 36, lw)
+        ui.drawCircle(centerRef, r - 0.0*lw, rgbm(0, 0, 0, 0.5), 36, lw)
         -- ui.endTextureShade(centerRef - r*vec2(1, 1), centerRef + r*vec2(1, 1))
 
         if (inst.isAircraftPreferSlavicUnit) then
@@ -1109,8 +1109,8 @@ function script.windowInstruments(dt)
         -- outer
         local lw2 = 0.2*rRef
         local r2 = r + 0.5*lw2
-        lw = 0.01*rRef
-        ui.drawCircle(centerRef, r - 0.5*lw, rgbm(0, 0, 0, 0.5), 36, lw)
+        lw = 0.02*rRef
+        ui.drawCircle(centerRef, r - 0.0*lw, rgbm(0, 0, 0, 0.5), 36, lw)
 
         
         ui.beginRotation()
