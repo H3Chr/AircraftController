@@ -2,7 +2,7 @@
 -- my personal utilities
 -- author: H3Chr
 h3u = {}
-h3u.version = 1.125 -- 2024.12.22
+h3u.version = 1.116
 h3u.updateCount = 0
 h3u.isUpdateError = false
 h3u.updater = function(throwWhenUpdateError)
@@ -31,7 +31,7 @@ h3u.updater = function(throwWhenUpdateError)
                 if (h3u.updateCount >= 300) then
                     h3u.isUpdateError = true
                 else
-                    h3u.bkppath = (h3u.curpath..'_'..ver_str..'_bkp.lua')
+                    h3u.bkppath = (h3u.curpath..'_'..ver_str..'_bkp')
                     local ret
                     ac.warn('h3u.lua New version '..ltv..' is available. Updating...')
                     ret = os.execute('COPY '..h3u.curpath..' '..h3u.bkppath, 1000, true) -- backup current versin file ---
@@ -50,7 +50,6 @@ h3u.updater = function(throwWhenUpdateError)
 end
 h3u.updater()
 ac.warn('h3u.lua library: ver'..h3u.version)
-ac.setLogSilent(true)
 --------
 h3u.replayFrame = (ac.getSim().isReplayActive) and ac.getSim().replayCurrentFrame or ac.getSim().replayFrames
 
@@ -87,23 +86,20 @@ h3u.unitMeterToNM = function(lengthMeter)
     return 0.000539957*lengthMeter
 end
 
-h3u.unitMSToKmh = function(speedMS)
-    return 3.6*speedMS
+h3u.unitMSToKmh = function(sppedMS)
+    return 3.6*sppedMS
 end
 
-h3u.unitKmhToMph = function(speedKmh)
-    return 6.21371*speedKmh
+h3u.unitKmhToMph = function(sppedKmh)
+    return 6.21371*sppedKmh
 end
 
-h3u.unitMSToKt = function(speedMS)
-    return 1.94384*speedMS
+h3u.unitMSToKt = function(sppedMS)
+    return 1.94384*sppedMS
 end
 
 
 function h3u.rateLimit(valFrom, valTo, up, dn, dt)
-    if (valFrom == nil) then
-        valFrom = valTo
-    end
     if (valFrom < valTo) then
         return (up) and math.min(valFrom + up*dt, valTo) or valTo
     elseif (valFrom > valTo) then
@@ -113,16 +109,9 @@ function h3u.rateLimit(valFrom, valTo, up, dn, dt)
 end
 
 function h3u.rateLimitVec(vecFrom, vecTo, rate, dt)
-    if (vecFrom == nil) then
-        vecFrom = vecTo
-    end
     local vecDiff = (vecTo - vecFrom)
     local vecDiffLen = vecDiff:length()
     return vecFrom + math.min(dt*rate, vecDiffLen)*vecDiff:normalize()
-end
-
-function h3u.applyLag(value, target, lag, dt)
-    return math.applyLag(value or target, target, lag, dt)
 end
 
 function h3u.deadZone(val, zoneUp, zoneDn, upOffset, dnOffset)
@@ -212,35 +201,6 @@ function h3u.rotateVec2(vec, radians)
     local newX = vec.x*math.cos(radians) + vec.y*math.sin(radians)
     local newY = -vec.x*math.sin(radians) + vec.y*math.cos(radians)
     return vec2(newX, newY)
-end
-
-function h3u.calcAlphaRadSmooth(velocity, smoothness)
-    smoothness = smoothness or 1
-    return (1 - math.exp(-math.abs(velocity.z)/smoothness))*math.atan2(velocity.y, velocity.z)
-end
-
-function h3u.calcBetaRadSmooth(velocity, smoothness)
-    smoothness = smoothness or 1
-    return (1 - math.exp(-math.abs(velocity.z)/smoothness))*math.atan2(velocity.x, velocity.z)
-end
-
-function h3u.calcLocalPointVelocity(car, localPos)
-    local lav = car.localAngularVelocity
-    -- local r1 = car.localVelocity/lav
-    -- local r2 = r1 + pos
-    -- local lpv = r2*lav
-    local lpv = car.localVelocity + vec3(localPos.y*lav.z + localPos.z*lav.y, localPos.x*lav.z + localPos.z*lav.x, localPos.x*lav.y + localPos.y*lav.x)
-    return lpv
-end
-
-function h3u.calcLocalPointAlphaRad(car, localPos, airVelocity, smoothness)
-    local lpvWithAir = h3u.calcLocalPointVelocity(car, localPos) + airVelocity
-    return h3u.calcAlphaRadSmooth(lpvWithAir, smoothness)
-end
-
-function h3u.calcLocalPointBetaRad(car, localPos, airVelocity, smoothness)
-    local lpvWithAir = h3u.calcLocalPointVelocity(car, localPos) + airVelocity
-    return h3u.calcBetaRadSmooth(lpvWithAir, smoothness)
 end
 
 function h3u.addForceSafe(position, posLocal, force, forceLocal)
@@ -375,22 +335,6 @@ function h3u.calcLut(lutData, x)
         local xn = (x - lutData[lutXi1][1])/(lutData[lutXi2][1] - lutData[lutXi1][1])
         return math.lerp(lutData[lutXi1][2], lutData[lutXi2][2], xn)
     end
-end
-
-function h3u.gainLutY(lutData, gainY)
-    local lutOut = table.clone(lutData, true)
-    for i, t in ipairs(lutOut) do
-        t[2] = gainY*t[2]
-    end
-    return lutOut
-end
-
-function h3u.func2Lut(lutData, func) -- func(x, y)
-    local lutOut = table.clone(lutData, true)
-    for i, t in ipairs(lutOut) do
-        t[2] = func(t[1], t[2])
-    end
-    return lutOut
 end
 
 
@@ -1289,9 +1233,11 @@ function h3u.drawCMStyleConfigBlock(itemBase, blockWidth, blockGap, cfgParent, n
                 pos = pos + vec2(0, 18 + blockGap)
 
                 ui.setCursor(pos)
-                if (ui.checkbox(string.format('Invert##Check%s%dResetInvert', nCont, iAlter), cfg.rstInvert:get())) then
+                if (ui.checkbox(string.format('##Check%s%dResetInvert', nCont, iAlter), cfg.rstInvert:get())) then
                     cfg.rstInvert:set(not cfg.rstInvert:get())
                 end
+                ui.sameLine(0, -1)
+                ui.text('Invert')
                 pos = pos + vec2(0, 20 + blockGap)
 
             end
@@ -1482,21 +1428,15 @@ function h3u.drawCMStyleConfigBlock(itemBase, blockWidth, blockGap, cfgParent, n
         pos = pos + vec2(0, 18 + blockGap)
 
         ui.setCursor(pos)
-        if (ui.checkbox(string.format('Invert##Check%s%dBindInvert', nCont, iAlter), cfg.bindInvert:get())) then
+        if (ui.checkbox(string.format('##Check%s%dBindInvert', nCont, iAlter), cfg.bindInvert:get())) then
             cfg.bindInvert:set(not cfg.bindInvert:get())
         end
+        ui.sameLine(0, -1)
+        ui.text('Invert')
         pos = pos + vec2(0, 20 + blockGap)
 
         ui.setCursor(pos)
         yMax = math.max(yMax, ui.getCursor().y)
-    elseif (cfg.bindConfigType:get() ~= 1) then
-        pos = posBuf + vec2(halfWidth + blockGap, 0)
-        pos = pos + vec2(0, 10 + blockGap)
-
-        ui.setCursor(pos)
-        if (ui.checkbox(string.format('Ignore other \ncontrol bindings##Check%s%dIgnoreOtherBinds', nCont, iAlter), cfg.ignoreOtherBinds:get())) then
-            cfg.ignoreOtherBinds:set(not cfg.ignoreOtherBinds:get())
-        end
     end
 
 
@@ -1540,43 +1480,28 @@ function h3u.drawCMStyleConfigBlock(itemBase, blockWidth, blockGap, cfgParent, n
         ui.setCursor(pos)
         if (cfgNOpt == 'configType') then
             local checked = (cfg[cfgNOpt]:get() == tOpt[3])
-            if (ui.checkbox(string.format('%s##Check%s%d%s%d', nameOpt, nCont, iAlter, cfgNOpt, tOpt[3]), checked)) then
+            if (ui.checkbox(string.format('##Check%s%d%s%d', nCont, iAlter, cfgNOpt, tOpt[3]), checked)) then
                 if (checked) then
                     cfg[cfgNOpt]:set(1)
                 else
                     cfg[cfgNOpt]:set(tOpt[3])
                 end
             end
+            ui.sameLine(0, -1)
+            ui.text(nameOpt)
             optSize = vec2(halfWidth, 20)
         else
-            if (ui.checkbox(string.format('%s##Check%s%d%s', nameOpt, nCont, iAlter, cfgNOpt), cfg[cfgNOpt]:get())) then
+            if (ui.checkbox(string.format('##Check%s%d%s', nCont, iAlter, cfgNOpt), cfg[cfgNOpt]:get())) then
                 cfg[cfgNOpt]:set(not cfg[cfgNOpt]:get())
             end
+            ui.sameLine(0, -1)
+            ui.text(nameOpt)
             optSize = vec2(halfWidth, 20)
         end
     end
     ui.text()
     yMax = math.max(yMax, ui.getCursor().y)
     return yMax
-end
-
-
-h3u.addOscilloKey = function(sharedDataName)
-    for i = 1, 2048 do
-        local search = ac.load('Oscilloscope.dataName.'..i)
-        if (search == sharedDataName) then
-            break
-        elseif (search == nil) then
-            ac.store('Oscilloscope.dataName.'..i, sharedDataName)
-            break
-        end
-    end
-    return 
-end
-
-h3u.updateOscillo = function(sharedDataName, val)
-    h3u.addOscilloKey(sharedDataName)
-    ac.store(sharedDataName, val)
 end
 
 --
@@ -1672,6 +1597,69 @@ h3u.drawOrder.new = function()
     return obj
 end
 --
+
+h3u.oscillo = {}
+h3u.oscillo.new = function(datai, name, channels, min, size, grid, keepAspectRatio)
+    local obj = {}
+    obj.datai = datai
+    obj.name = name
+    obj.channels = channels
+    obj.min = min
+    obj.size = size
+    obj.grid = grid
+    obj.keepAspectRatio = keepAspectRatio
+    obj.dcs = {}
+    obj.lastPoses = {}
+    obj.lastColors = {}
+    ac.store(string.format('Oscilloscope.%d.name', datai), name)
+    ac.store(string.format('Oscilloscope.%d.xMin', datai), min.x)
+    ac.store(string.format('Oscilloscope.%d.xSize', datai), size.x)
+    ac.store(string.format('Oscilloscope.%d.yMin', datai), min.y)
+    ac.store(string.format('Oscilloscope.%d.ySize', datai), size.y)
+    ac.store(string.format('Oscilloscope.%d.xGrid', datai), grid.x)
+    ac.store(string.format('Oscilloscope.%d.yGrid', datai), grid.y)
+    ac.store(string.format('Oscilloscope.%d.channelsCount', datai), channels)
+    ac.store(string.format('Oscilloscope.%d.keepAspectRatio', datai), keepAspectRatio or false)
+    
+    obj.beginPathLine = function(self, ch)
+        self.dcs[ch] = 1
+    end
+    obj.pathLineTo = function(self, ch, pos, color)
+        pos = pos or self.lastPoses[ch]
+        color = color or self.lastColors[ch]
+        if (self.dcs[ch] == 1) then
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.x', self.datai, ch, self.dcs[ch]), pos.x)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.y', self.datai, ch, self.dcs[ch]), pos.y)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.r', self.datai, ch, self.dcs[ch]), color.r)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.g', self.datai, ch, self.dcs[ch]), color.g)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.b', self.datai, ch, self.dcs[ch]), color.b)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.m', self.datai, ch, self.dcs[ch]), 0*color.mult)
+            self.dcs[ch] = self.dcs[ch] + 1
+        end
+        if (self.dcs[ch] > 1) then
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.x', self.datai, ch, self.dcs[ch]), pos.x)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.y', self.datai, ch, self.dcs[ch]), pos.y)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.r', self.datai, ch, self.dcs[ch]), color.r)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.g', self.datai, ch, self.dcs[ch]), color.g)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.b', self.datai, ch, self.dcs[ch]), color.b)
+            ac.store(string.format('Oscilloscope.%d.%d.data.%d.m', self.datai, ch, self.dcs[ch]), color.mult)
+            self.dcs[ch] = self.dcs[ch] + 1
+        end
+        self.lastPoses[ch] = pos
+        self.lastColors[ch] = color
+    end
+    obj.endPathLine = function(self, ch)
+        ac.store(string.format('Oscilloscope.%d.%d.data.%d.x', self.datai, ch, self.dcs[ch]), self.lastPoses[ch].x)
+        ac.store(string.format('Oscilloscope.%d.%d.data.%d.y', self.datai, ch, self.dcs[ch]), self.lastPoses[ch].y)
+        ac.store(string.format('Oscilloscope.%d.%d.data.%d.r', self.datai, ch, self.dcs[ch]), self.lastColors[ch].r)
+        ac.store(string.format('Oscilloscope.%d.%d.data.%d.g', self.datai, ch, self.dcs[ch]), self.lastColors[ch].g)
+        ac.store(string.format('Oscilloscope.%d.%d.data.%d.b', self.datai, ch, self.dcs[ch]), self.lastColors[ch].b)
+        ac.store(string.format('Oscilloscope.%d.%d.data.%d.m', self.datai, ch, self.dcs[ch]), self.lastColors[ch].mult)
+        ac.store(string.format('Oscilloscope.%d.%d.dataCount', self.datai, ch), self.dcs[ch])
+        self.dcs[ch] = 0
+    end
+    return obj
+end
 
 h3u.MSDmodel = {}
 h3u.MSDmodel.new = function(m, s, d, disLimit, neutral)
@@ -1979,7 +1967,6 @@ h3u.contCfgSys.new = function(id, tblSetConts, tblThresh, alterInputCount)
             n = 'bindDpadDir'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), 0)
             n = 'bindThresh'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), 0.5)
             n = 'bindInvert'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), false)
-            n = 'ignoreOtherBinds'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), false)
     
             n = 'rstConfigType'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), 0)
             n = 'rstInputType'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), 0)
@@ -2335,7 +2322,7 @@ h3u.contCfgSys.new = function(id, tblSetConts, tblThresh, alterInputCount)
                             end
                         end
                     end
-                    alti.bindValid = cfg.ignoreOtherBinds:get() or (not alti.otherBindPressed)
+                    alti.bindValid = not alti.otherBindPressed
                 end
 
                 if (cfg.configType:get() == 1) then
@@ -2415,7 +2402,7 @@ h3u.contCfgSys.new = function(id, tblSetConts, tblThresh, alterInputCount)
                     else
                         loi.valContN = self.calcAnalog(alti.axisRawBind, loi.valDefault, cfg.axisMin:get(), cfg.axisMax:get(), cfg.axisGamma:get(), cfg.axisInvert:get())
                     end
-                    -- ac.warn(contName, alti.axisRawBind)
+                    ac.warn(contName, alti.axisRawBind)
                 elseif (cfg.configType:get() == 3) then
                     local axis1 = self.calcAnalog(alti.axisRawBind, loi.valDefault, cfg.axisMin:get(), cfg.axisMax:get(), cfg.axisGamma:get(), cfg.axisInvert:get())
                     local axis2 = self.calcAnalog(alti.axis2RawBind, loi.valDefault, cfg.axis2Min:get(), cfg.axis2Max:get(), cfg.axis2Gamma:get(), cfg.axis2Invert:get())

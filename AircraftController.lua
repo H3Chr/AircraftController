@@ -1,10 +1,37 @@
 app = {}
 require('h3u')
 
-app.conts = {'Pitch', 'Roll', 'Yaw', 'Pitch Trim', 'Roll Trim', 'Yaw Trim', 'Flap', 'Spoiler', 'Air Brake', 'Wheel Brake', 'Throttle #1', 'Throttle #2', 'Throttle #3', 'Throttle #4'}
-app.valInits = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 1, 0, 0, 0, 0}
-app.valDefaults = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0}
-app.isRelatives = {false, false, false, true, true, true, true, true, true, true, true, true, true, true}
+local tblConts = {}
+tblConts[#tblConts + 1] = {'Pitch', 0.5, 0.5, false}
+tblConts[#tblConts + 1] = {'Roll', 0.5, 0.5, false}
+tblConts[#tblConts + 1] = {'Yaw', 0.5, 0.5, false}
+tblConts[#tblConts + 1] = {'Pitch Trim', 0.5, 0.5, true}
+tblConts[#tblConts + 1] = {'Roll Trim', 0.5, 0.5, true}
+tblConts[#tblConts + 1] = {'Yaw Trim', 0.5, 0.5, true}
+tblConts[#tblConts + 1] = {'Flap', 0, 0, true}
+tblConts[#tblConts + 1] = {'Spoiler', 0, 0, true}
+tblConts[#tblConts + 1] = {'Air Brake', 0, 0, true}
+tblConts[#tblConts + 1] = {'Wheel Brake', 1, 0, true}
+tblConts[#tblConts + 1] = {'Throttle #1', 0, 0, true}
+tblConts[#tblConts + 1] = {'Throttle #2', 0, 0, true}
+tblConts[#tblConts + 1] = {'Throttle #3', 0, 0, true}
+tblConts[#tblConts + 1] = {'Throttle #4', 0, 0, true}
+tblConts[#tblConts + 1] = {'Wheel Steering', 0.5, 0.5, false}
+app.conts = {}
+app.valInits = {}
+app.valDefaults = {}
+app.isRelatives = {}
+for i, t in ipairs(tblConts) do
+    app.conts[i] = t[1]
+    app.valInits[i] = t[2]
+    app.valDefaults[i] = t[3]
+    app.isRelatives[i] = t[4]
+end
+
+-- app.conts = {'Pitch', 'Roll', 'Yaw', 'Pitch Trim', 'Roll Trim', 'Yaw Trim', 'Flap', 'Spoiler', 'Air Brake', 'Wheel Brake', 'Throttle #1', 'Throttle #2', 'Throttle #3', 'Throttle #4'}
+-- app.valInits = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 1, 0, 0, 0, 0}
+-- app.valDefaults = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0}
+-- app.isRelatives = {false, false, false, true, true, true, true, true, true, true, true, true, true, true}
 app.throttleCountMax = 4
 app.alterInputCount = 3
 
@@ -38,6 +65,23 @@ function script.update(dt)
     app.config:update(dt, funIsAvailable, funIsOverwrite, funOverwriteVal, funLoopFinal)
 
     h3u.updater(true)
+
+    
+    -- for i = 0, ac.getJoystickCount() - 1 do
+    --     -- ac.log(i, ac.getJoystickName(i), ac.getJoystickProductGUID(i), ac.getJoystickInstanceGUID(i), ac.getJoystickAxisValue(i, 0))
+    --     ac.log(i, ac.getJoystickName(i))
+    --     for j = 0, ac.getJoystickAxisCount(i) do
+    --         ac.log('  '..ac.getJoystickAxisValue(i, j))
+    --     end
+    -- end
+    -- show ac functions
+    -- local text = ''
+    -- for k, v in pairs(ac) do
+    --     if (type(v) == 'function') then
+    --         text = text..k..'\n'
+    --     end
+    -- end
+    -- ac.log(text)
 end
 
 --------
@@ -242,7 +286,7 @@ function script.windowSettings(dt)
         if (app.uiSettings.Configuration.tabCur == 2) then
             tConts = {app.config.conts[1], app.config.conts[2], app.config.conts[3]}
         elseif (app.uiSettings.Configuration.tabCur == 3) then
-            tConts = {app.config.conts[7], app.config.conts[8], app.config.conts[9], app.config.conts[10]}
+            tConts = {app.config.conts[7], app.config.conts[8], app.config.conts[9], app.config.conts[10], app.config.conts[15]}
         elseif (app.uiSettings.Configuration.tabCur == 4) then
             tConts = {app.config.conts[4], app.config.conts[5], app.config.conts[6]}
         elseif (app.uiSettings.Configuration.tabCur == 5) then

@@ -2,7 +2,7 @@
 -- my personal utilities
 -- author: H3Chr
 h3u = {}
-h3u.version = 1.125 -- 2024.12.22
+h3u.version = 1.120
 h3u.updateCount = 0
 h3u.isUpdateError = false
 h3u.updater = function(throwWhenUpdateError)
@@ -50,7 +50,6 @@ h3u.updater = function(throwWhenUpdateError)
 end
 h3u.updater()
 ac.warn('h3u.lua library: ver'..h3u.version)
-ac.setLogSilent(true)
 --------
 h3u.replayFrame = (ac.getSim().isReplayActive) and ac.getSim().replayCurrentFrame or ac.getSim().replayFrames
 
@@ -87,23 +86,20 @@ h3u.unitMeterToNM = function(lengthMeter)
     return 0.000539957*lengthMeter
 end
 
-h3u.unitMSToKmh = function(speedMS)
-    return 3.6*speedMS
+h3u.unitMSToKmh = function(sppedMS)
+    return 3.6*sppedMS
 end
 
-h3u.unitKmhToMph = function(speedKmh)
-    return 6.21371*speedKmh
+h3u.unitKmhToMph = function(sppedKmh)
+    return 6.21371*sppedKmh
 end
 
-h3u.unitMSToKt = function(speedMS)
-    return 1.94384*speedMS
+h3u.unitMSToKt = function(sppedMS)
+    return 1.94384*sppedMS
 end
 
 
 function h3u.rateLimit(valFrom, valTo, up, dn, dt)
-    if (valFrom == nil) then
-        valFrom = valTo
-    end
     if (valFrom < valTo) then
         return (up) and math.min(valFrom + up*dt, valTo) or valTo
     elseif (valFrom > valTo) then
@@ -113,16 +109,9 @@ function h3u.rateLimit(valFrom, valTo, up, dn, dt)
 end
 
 function h3u.rateLimitVec(vecFrom, vecTo, rate, dt)
-    if (vecFrom == nil) then
-        vecFrom = vecTo
-    end
     local vecDiff = (vecTo - vecFrom)
     local vecDiffLen = vecDiff:length()
     return vecFrom + math.min(dt*rate, vecDiffLen)*vecDiff:normalize()
-end
-
-function h3u.applyLag(value, target, lag, dt)
-    return math.applyLag(value or target, target, lag, dt)
 end
 
 function h3u.deadZone(val, zoneUp, zoneDn, upOffset, dnOffset)
@@ -212,35 +201,6 @@ function h3u.rotateVec2(vec, radians)
     local newX = vec.x*math.cos(radians) + vec.y*math.sin(radians)
     local newY = -vec.x*math.sin(radians) + vec.y*math.cos(radians)
     return vec2(newX, newY)
-end
-
-function h3u.calcAlphaRadSmooth(velocity, smoothness)
-    smoothness = smoothness or 1
-    return (1 - math.exp(-math.abs(velocity.z)/smoothness))*math.atan2(velocity.y, velocity.z)
-end
-
-function h3u.calcBetaRadSmooth(velocity, smoothness)
-    smoothness = smoothness or 1
-    return (1 - math.exp(-math.abs(velocity.z)/smoothness))*math.atan2(velocity.x, velocity.z)
-end
-
-function h3u.calcLocalPointVelocity(car, localPos)
-    local lav = car.localAngularVelocity
-    -- local r1 = car.localVelocity/lav
-    -- local r2 = r1 + pos
-    -- local lpv = r2*lav
-    local lpv = car.localVelocity + vec3(localPos.y*lav.z + localPos.z*lav.y, localPos.x*lav.z + localPos.z*lav.x, localPos.x*lav.y + localPos.y*lav.x)
-    return lpv
-end
-
-function h3u.calcLocalPointAlphaRad(car, localPos, airVelocity, smoothness)
-    local lpvWithAir = h3u.calcLocalPointVelocity(car, localPos) + airVelocity
-    return h3u.calcAlphaRadSmooth(lpvWithAir, smoothness)
-end
-
-function h3u.calcLocalPointBetaRad(car, localPos, airVelocity, smoothness)
-    local lpvWithAir = h3u.calcLocalPointVelocity(car, localPos) + airVelocity
-    return h3u.calcBetaRadSmooth(lpvWithAir, smoothness)
 end
 
 function h3u.addForceSafe(position, posLocal, force, forceLocal)
@@ -1289,9 +1249,11 @@ function h3u.drawCMStyleConfigBlock(itemBase, blockWidth, blockGap, cfgParent, n
                 pos = pos + vec2(0, 18 + blockGap)
 
                 ui.setCursor(pos)
-                if (ui.checkbox(string.format('Invert##Check%s%dResetInvert', nCont, iAlter), cfg.rstInvert:get())) then
+                if (ui.checkbox(string.format('##Check%s%dResetInvert', nCont, iAlter), cfg.rstInvert:get())) then
                     cfg.rstInvert:set(not cfg.rstInvert:get())
                 end
+                ui.sameLine(0, -1)
+                ui.text('Invert')
                 pos = pos + vec2(0, 20 + blockGap)
 
             end
@@ -1482,21 +1444,15 @@ function h3u.drawCMStyleConfigBlock(itemBase, blockWidth, blockGap, cfgParent, n
         pos = pos + vec2(0, 18 + blockGap)
 
         ui.setCursor(pos)
-        if (ui.checkbox(string.format('Invert##Check%s%dBindInvert', nCont, iAlter), cfg.bindInvert:get())) then
+        if (ui.checkbox(string.format('##Check%s%dBindInvert', nCont, iAlter), cfg.bindInvert:get())) then
             cfg.bindInvert:set(not cfg.bindInvert:get())
         end
+        ui.sameLine(0, -1)
+        ui.text('Invert')
         pos = pos + vec2(0, 20 + blockGap)
 
         ui.setCursor(pos)
         yMax = math.max(yMax, ui.getCursor().y)
-    elseif (cfg.bindConfigType:get() ~= 1) then
-        pos = posBuf + vec2(halfWidth + blockGap, 0)
-        pos = pos + vec2(0, 10 + blockGap)
-
-        ui.setCursor(pos)
-        if (ui.checkbox(string.format('Ignore other \ncontrol bindings##Check%s%dIgnoreOtherBinds', nCont, iAlter), cfg.ignoreOtherBinds:get())) then
-            cfg.ignoreOtherBinds:set(not cfg.ignoreOtherBinds:get())
-        end
     end
 
 
@@ -1540,18 +1496,22 @@ function h3u.drawCMStyleConfigBlock(itemBase, blockWidth, blockGap, cfgParent, n
         ui.setCursor(pos)
         if (cfgNOpt == 'configType') then
             local checked = (cfg[cfgNOpt]:get() == tOpt[3])
-            if (ui.checkbox(string.format('%s##Check%s%d%s%d', nameOpt, nCont, iAlter, cfgNOpt, tOpt[3]), checked)) then
+            if (ui.checkbox(string.format('##Check%s%d%s%d', nCont, iAlter, cfgNOpt, tOpt[3]), checked)) then
                 if (checked) then
                     cfg[cfgNOpt]:set(1)
                 else
                     cfg[cfgNOpt]:set(tOpt[3])
                 end
             end
+            ui.sameLine(0, -1)
+            ui.text(nameOpt)
             optSize = vec2(halfWidth, 20)
         else
-            if (ui.checkbox(string.format('%s##Check%s%d%s', nameOpt, nCont, iAlter, cfgNOpt), cfg[cfgNOpt]:get())) then
+            if (ui.checkbox(string.format('##Check%s%d%s', nCont, iAlter, cfgNOpt), cfg[cfgNOpt]:get())) then
                 cfg[cfgNOpt]:set(not cfg[cfgNOpt]:get())
             end
+            ui.sameLine(0, -1)
+            ui.text(nameOpt)
             optSize = vec2(halfWidth, 20)
         end
     end
@@ -1979,7 +1939,6 @@ h3u.contCfgSys.new = function(id, tblSetConts, tblThresh, alterInputCount)
             n = 'bindDpadDir'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), 0)
             n = 'bindThresh'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), 0.5)
             n = 'bindInvert'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), false)
-            n = 'ignoreOtherBinds'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), false)
     
             n = 'rstConfigType'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), 0)
             n = 'rstInputType'; cfg[n] = ac.storage(string.format('%s-%d-%d-%s', id, contIndex, altInput, n), 0)
@@ -2335,7 +2294,7 @@ h3u.contCfgSys.new = function(id, tblSetConts, tblThresh, alterInputCount)
                             end
                         end
                     end
-                    alti.bindValid = cfg.ignoreOtherBinds:get() or (not alti.otherBindPressed)
+                    alti.bindValid = not alti.otherBindPressed
                 end
 
                 if (cfg.configType:get() == 1) then
@@ -2415,7 +2374,7 @@ h3u.contCfgSys.new = function(id, tblSetConts, tblThresh, alterInputCount)
                     else
                         loi.valContN = self.calcAnalog(alti.axisRawBind, loi.valDefault, cfg.axisMin:get(), cfg.axisMax:get(), cfg.axisGamma:get(), cfg.axisInvert:get())
                     end
-                    -- ac.warn(contName, alti.axisRawBind)
+                    ac.warn(contName, alti.axisRawBind)
                 elseif (cfg.configType:get() == 3) then
                     local axis1 = self.calcAnalog(alti.axisRawBind, loi.valDefault, cfg.axisMin:get(), cfg.axisMax:get(), cfg.axisGamma:get(), cfg.axisInvert:get())
                     local axis2 = self.calcAnalog(alti.axis2RawBind, loi.valDefault, cfg.axis2Min:get(), cfg.axis2Max:get(), cfg.axis2Gamma:get(), cfg.axis2Invert:get())

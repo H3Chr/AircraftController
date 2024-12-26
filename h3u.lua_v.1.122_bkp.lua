@@ -2,7 +2,7 @@
 -- my personal utilities
 -- author: H3Chr
 h3u = {}
-h3u.version = 1.125 -- 2024.12.22
+h3u.version = 1.123
 h3u.updateCount = 0
 h3u.isUpdateError = false
 h3u.updater = function(throwWhenUpdateError)
@@ -101,9 +101,6 @@ end
 
 
 function h3u.rateLimit(valFrom, valTo, up, dn, dt)
-    if (valFrom == nil) then
-        valFrom = valTo
-    end
     if (valFrom < valTo) then
         return (up) and math.min(valFrom + up*dt, valTo) or valTo
     elseif (valFrom > valTo) then
@@ -113,16 +110,9 @@ function h3u.rateLimit(valFrom, valTo, up, dn, dt)
 end
 
 function h3u.rateLimitVec(vecFrom, vecTo, rate, dt)
-    if (vecFrom == nil) then
-        vecFrom = vecTo
-    end
     local vecDiff = (vecTo - vecFrom)
     local vecDiffLen = vecDiff:length()
     return vecFrom + math.min(dt*rate, vecDiffLen)*vecDiff:normalize()
-end
-
-function h3u.applyLag(value, target, lag, dt)
-    return math.applyLag(value or target, target, lag, dt)
 end
 
 function h3u.deadZone(val, zoneUp, zoneDn, upOffset, dnOffset)
@@ -212,35 +202,6 @@ function h3u.rotateVec2(vec, radians)
     local newX = vec.x*math.cos(radians) + vec.y*math.sin(radians)
     local newY = -vec.x*math.sin(radians) + vec.y*math.cos(radians)
     return vec2(newX, newY)
-end
-
-function h3u.calcAlphaRadSmooth(velocity, smoothness)
-    smoothness = smoothness or 1
-    return (1 - math.exp(-math.abs(velocity.z)/smoothness))*math.atan2(velocity.y, velocity.z)
-end
-
-function h3u.calcBetaRadSmooth(velocity, smoothness)
-    smoothness = smoothness or 1
-    return (1 - math.exp(-math.abs(velocity.z)/smoothness))*math.atan2(velocity.x, velocity.z)
-end
-
-function h3u.calcLocalPointVelocity(car, localPos)
-    local lav = car.localAngularVelocity
-    -- local r1 = car.localVelocity/lav
-    -- local r2 = r1 + pos
-    -- local lpv = r2*lav
-    local lpv = car.localVelocity + vec3(localPos.y*lav.z + localPos.z*lav.y, localPos.x*lav.z + localPos.z*lav.x, localPos.x*lav.y + localPos.y*lav.x)
-    return lpv
-end
-
-function h3u.calcLocalPointAlphaRad(car, localPos, airVelocity, smoothness)
-    local lpvWithAir = h3u.calcLocalPointVelocity(car, localPos) + airVelocity
-    return h3u.calcAlphaRadSmooth(lpvWithAir, smoothness)
-end
-
-function h3u.calcLocalPointBetaRad(car, localPos, airVelocity, smoothness)
-    local lpvWithAir = h3u.calcLocalPointVelocity(car, localPos) + airVelocity
-    return h3u.calcBetaRadSmooth(lpvWithAir, smoothness)
 end
 
 function h3u.addForceSafe(position, posLocal, force, forceLocal)
