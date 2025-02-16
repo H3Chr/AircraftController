@@ -2,7 +2,7 @@
 -- my personal utilities
 -- author: H3Chr
 h3u = {}
-h3u.version = 1.133 -- 2025.02.11
+h3u.version = 1.129 -- 2025.02.03
 h3u.updateCount = 0
 h3u.isUpdateError = false
 h3u.updater = function(throwWhenUpdateError)
@@ -155,9 +155,6 @@ function h3u.hysteresis(valFrom, valTo, hysUp, hysDn)
     return valFrom
 end
 
-function h3u.powerMinusOk(x, pow)
-    return math.sign(x)*(math.abs(x)^pow)
-end
 
 function h3u.sigmoid(x)
     if ((x == 1.0) or (x == 0.0)) then return x end
@@ -614,9 +611,8 @@ h3u.h3aero.new = function(carIndex, isPhysics)
     obj.cdGain = {}
     obj.sweepAngle = {}
     obj.lutMix = {}
-    obj.cForce = {}
-    obj.force = {}
-    obj.torque = {}
+    obj.forces = {}
+    obj.torques = {}
     obj.iniWings = {}
     for iWing = 0, 1024 do
         local section = 'WING_'..iWing
@@ -653,14 +649,13 @@ h3u.h3aero.new = function(carIndex, isPhysics)
         obj.clGain[iWing] = 1
         obj.cdGain[iWing] = 1
         obj.sweepAngle[iWing] = obj.iniWings[iWing].H3_SWEEP_ANGLE_OFFSET
-        obj.cForce[iWing] = vec3()
-        obj.force[iWing] = vec3()
-        obj.torque[iWing] = vec3()
+        obj.forces[iWing] = vec3()
+        obj.torques[iWing] = vec3()
     end
     
     obj.update = function(self, airDensity, trueAirSpeedMS, soundSpeedMS)
-        self.forceCogExt = vec3()
-        self.torqueExt = vec3()
+        self.forceCogTotal = vec3()
+        self.torqueTotal = vec3()
         local mach = trueAirSpeedMS/soundSpeedMS
         local machGainBase = 1*h3u.softplus(3*(10*mach - 8))
 
@@ -690,27 +685,20 @@ h3u.h3aero.new = function(carIndex, isPhysics)
             -- ac.warn(tblWingIni.NAME, 'cd', cForceWing.z)
 
             local cForceVehicle = cForceWing:rotate(quat.fromAngleAxis(math.rad(tblWingIni.H3_DIHEDRAL_ANGLE), vec3(0, 0, 1)))
-            self.cForce[iWingIni] = cForceVehicle
             self.clGain[iWingIni] = cForceVehicle.y
             self.cdGain[iWingIni] = cForceVehicle.z
 
-            local forceVehicle = 0.5*airDensity*(trueAirSpeedMS^2)*area*cForceVehicle
-            self.force[iWingIni] = forceVehicle
-            -- ac.warn(tblWingIni.NAME, forceVehicleE.x)
-            local forceVehicleE = vec3(1, 0, 0)*forceVehicle
-            self.forceCogExt = self.forceCogExt + forceVehicleE
-
+            local forceVehicle = 0.5*airDensity*(trueAirSpeedMS^2)*area*vec3(1, 0, 0)*cForceVehicle
+            self.forces[iWingIni] = forceVehicle
+            -- ac.warn(tblWingIni.NAME, cForceVehicle.x)
+            
+            self.forceCogTotal = self.forceCogTotal + forceVehicle
             local torque = vec3()
             torque.x = tblWingIni.POSITION.y*forceVehicle.z + tblWingIni.POSITION.z*forceVehicle.y
             torque.y = tblWingIni.POSITION.x*forceVehicle.z + tblWingIni.POSITION.z*forceVehicle.x
-            torque.z = tblWingIni.POSITION.y*forceVehicle.x + tblWingIni.POSITION.x*forceVehicle.y
-            self.torque[iWingIni] = torque
-            
-            local torqueE = vec3()
-            torqueE.x = 0
-            torqueE.y = tblWingIni.POSITION.z*forceVehicleE.x
-            torqueE.z = tblWingIni.POSITION.y*forceVehicleE.x
-            self.torqueExt = self.torqueExt + torqueE
+            torque.z = tblWingIni.POSITION.y*forceVehicle.z + tblWingIni.POSITION.x*forceVehicle.y
+            self.torques[iWingIni] = torque
+            self.torqueTotal = self.torqueTotal + torque
             if (self.isPhysics) then
                 h3u.setWingGainSafe(iWingIni, self.cdGain[iWingIni], self.clGain[iWingIni])
             end
@@ -720,13 +708,13 @@ h3u.h3aero.new = function(carIndex, isPhysics)
         -- ac.warn('force', self.forces[10] + self.forces[11])
         -- ac.log('torque', self.torques[10] + self.torques[11])
 
-        self.forceCogExt = self.forceCogExt--/#self.iniWings
-        self.torqueExt = self.torqueExt--/#self.iniWings
-        ac.error('forceCogExt', self.forceCogExt)
-        ac.error('torqueExt', self.torqueExt)
+        self.forceCogTotal = self.forceCogTotal--/#self.iniWings
+        self.torqueTotal = self.torqueTotal--/#self.iniWings
+        ac.error('forceCogTotal', self.forceCogTotal)
+        ac.error('torqueTotal', self.torqueTotal)
         if (self.isPhysics) then
-            h3u.addForceSafe(vec3(), true, self.forceCogExt, true)
-            h3u.addTorqueSafe(self.torqueExt, true)
+            h3u.addForceSafe(vec3(), true, self.forceCogTotal, true)
+            h3u.addTorqueSafe(self.torqueTotal, true)
         end
         return self
     end
@@ -1802,12 +1790,12 @@ h3u.digTimer.new = function(interval, init)
     local obj = {}
     obj.timer = init
     obj.update = function(self, dt)
-        self.isTrig = (self.timer == 0)
         if (self.timer >= interval) then
             self.timer = 0
         else
             self.timer = self.timer + dt
         end
+        self.isTrig = (self.timer == 0)
         return self.isTrig
     end
     return obj

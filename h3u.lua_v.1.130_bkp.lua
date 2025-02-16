@@ -2,7 +2,7 @@
 -- my personal utilities
 -- author: H3Chr
 h3u = {}
-h3u.version = 1.133 -- 2025.02.11
+h3u.version = 1.131 -- 2025.02.05
 h3u.updateCount = 0
 h3u.isUpdateError = false
 h3u.updater = function(throwWhenUpdateError)
@@ -614,9 +614,8 @@ h3u.h3aero.new = function(carIndex, isPhysics)
     obj.cdGain = {}
     obj.sweepAngle = {}
     obj.lutMix = {}
-    obj.cForce = {}
-    obj.force = {}
-    obj.torque = {}
+    obj.forces = {}
+    obj.torques = {}
     obj.iniWings = {}
     for iWing = 0, 1024 do
         local section = 'WING_'..iWing
@@ -653,9 +652,8 @@ h3u.h3aero.new = function(carIndex, isPhysics)
         obj.clGain[iWing] = 1
         obj.cdGain[iWing] = 1
         obj.sweepAngle[iWing] = obj.iniWings[iWing].H3_SWEEP_ANGLE_OFFSET
-        obj.cForce[iWing] = vec3()
-        obj.force[iWing] = vec3()
-        obj.torque[iWing] = vec3()
+        obj.forces[iWing] = vec3()
+        obj.torques[iWing] = vec3()
     end
     
     obj.update = function(self, airDensity, trueAirSpeedMS, soundSpeedMS)
@@ -690,12 +688,11 @@ h3u.h3aero.new = function(carIndex, isPhysics)
             -- ac.warn(tblWingIni.NAME, 'cd', cForceWing.z)
 
             local cForceVehicle = cForceWing:rotate(quat.fromAngleAxis(math.rad(tblWingIni.H3_DIHEDRAL_ANGLE), vec3(0, 0, 1)))
-            self.cForce[iWingIni] = cForceVehicle
             self.clGain[iWingIni] = cForceVehicle.y
             self.cdGain[iWingIni] = cForceVehicle.z
 
             local forceVehicle = 0.5*airDensity*(trueAirSpeedMS^2)*area*cForceVehicle
-            self.force[iWingIni] = forceVehicle
+            self.forces[iWingIni] = forceVehicle
             -- ac.warn(tblWingIni.NAME, forceVehicleE.x)
             local forceVehicleE = vec3(1, 0, 0)*forceVehicle
             self.forceCogExt = self.forceCogExt + forceVehicleE
@@ -704,7 +701,7 @@ h3u.h3aero.new = function(carIndex, isPhysics)
             torque.x = tblWingIni.POSITION.y*forceVehicle.z + tblWingIni.POSITION.z*forceVehicle.y
             torque.y = tblWingIni.POSITION.x*forceVehicle.z + tblWingIni.POSITION.z*forceVehicle.x
             torque.z = tblWingIni.POSITION.y*forceVehicle.x + tblWingIni.POSITION.x*forceVehicle.y
-            self.torque[iWingIni] = torque
+            self.torques[iWingIni] = torque
             
             local torqueE = vec3()
             torqueE.x = 0
@@ -1802,12 +1799,12 @@ h3u.digTimer.new = function(interval, init)
     local obj = {}
     obj.timer = init
     obj.update = function(self, dt)
-        self.isTrig = (self.timer == 0)
         if (self.timer >= interval) then
             self.timer = 0
         else
             self.timer = self.timer + dt
         end
+        self.isTrig = (self.timer == 0)
         return self.isTrig
     end
     return obj

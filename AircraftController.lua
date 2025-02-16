@@ -86,6 +86,16 @@ end
 
 --------
 function script.windowMain(dt)
+    -- local wndName = ''
+    -- for i, tbl in pairs(ac.getAppWindows()) do
+    --     ac.log(tbl.title, tbl.name)
+    --     -- if (tbl.title == 'AircraftController Instruments') then
+    --     --     wndName = tbl.name
+    --     -- end
+    -- end
+    -- if (ui.mouseDoubleClicked(ui.MouseButton.Left)) then
+    --     ac.accessAppWindow('IMGUI_LUA_AircraftController_app_aircraft_controller_instruments'):move(vec2(0, 0))
+    -- end
     local colWhite = rgbm(1, 1, 1, 1)
     local colAGray = rgbm(0.8, 0.8, 0.8, 0.3)
     local colABlack2 = rgbm(0, 0, 0, 0.5)

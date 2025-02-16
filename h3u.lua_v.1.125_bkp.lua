@@ -2,7 +2,7 @@
 -- my personal utilities
 -- author: H3Chr
 h3u = {}
-h3u.version = 1.133 -- 2025.02.11
+h3u.version = 1.126 -- 2025.01.14
 h3u.updateCount = 0
 h3u.isUpdateError = false
 h3u.updater = function(throwWhenUpdateError)
@@ -99,14 +99,6 @@ h3u.unitMSToKt = function(speedMS)
     return 1.94384*speedMS
 end
 
-h3u.angleLoopDeg = function(angle)
-    return (angle + 180)%360 - 180
-end
-
-h3u.angleLoopRad = function(angle)
-    return (angle + math.pi)%(2*math.pi) - math.pi
-end
-
 
 function h3u.rateLimit(valFrom, valTo, up, dn, dt)
     if (valFrom == nil) then
@@ -133,11 +125,6 @@ function h3u.applyLag(value, target, lag, dt)
     return math.applyLag(value or target, target, lag, dt)
 end
 
-function h3u.applyLagPause(value, target, lag, dt)
-    local isPaused = ac.getSim().isPaused or (ac.getSim().isReplayActive and (ac.getSim().replayPlaybackRate == 0))
-    return math.applyLag(value or target, target, isPaused and 1 or lag, dt)
-end
-
 function h3u.deadZone(val, zoneUp, zoneDn, upOffset, dnOffset)
     if (val >= zoneUp) then
         return (val - zoneUp + upOffset)
@@ -155,9 +142,6 @@ function h3u.hysteresis(valFrom, valTo, hysUp, hysDn)
     return valFrom
 end
 
-function h3u.powerMinusOk(x, pow)
-    return math.sign(x)*(math.abs(x)^pow)
-end
 
 function h3u.sigmoid(x)
     if ((x == 1.0) or (x == 0.0)) then return x end
@@ -230,14 +214,6 @@ function h3u.rotateVec2(vec, radians)
     return vec2(newX, newY)
 end
 
-function h3u.absVec2(vec)
-    return vec2(math.abs(vec.x), math.abs(vec.y))
-end
-
-function h3u.absVec3(vec)
-    return vec3(math.abs(vec.x), math.abs(vec.y)), math.abs(vec.z)
-end
-
 function h3u.calcAlphaRadSmooth(velocity, smoothness)
     smoothness = smoothness or 1
     return (1 - math.exp(-math.abs(velocity.z)/smoothness))*math.atan2(velocity.y, velocity.z)
@@ -284,18 +260,6 @@ function h3u.setWingGainSafe(wingIndex, cdGain, clGain)
     return ac.setWingGain(wingIndex, cdGain, clGain)
 end
 
-
-function h3u.storeVec2(key, vec)
-    ac.store(key..'.x', vec.x)
-    ac.store(key..'.y', vec.y)
-end
-
-function h3u.loadVec2(key)
-    local x, y
-    x = ac.load(key..'.x')
-    y = ac.load(key..'.y')
-    return vec2(x, y)
-end
 
 function h3u.storeVec3(key, vec)
     ac.store(key..'.x', vec.x)
@@ -590,10 +554,8 @@ h3u.h3aero.new = function(carIndex, isPhysics)
         ZONE_RIGHT_CD = 0,
         YAW_CL_GAIN = 0,
         --Additional Parameters by H3Chr
-        H3_LUT1_AOA_CL = '(0=1)',
-        H3_LUT1_AOA_CD = '(0=1)',
-        H3_LUT2_AOA_CL = '(0=1)',
-        H3_LUT2_AOA_CD = '(0=1)',
+        H3_LUT_AOA_CL = '(0=1)',
+        H3_LUT_AOA_CD = '(0=1)',
         H3_MACH_CL_GAIN = 0,
         H3_MACH_CD_GAIN = 1,
         H3_SWEEP_ANGLE_OFFSET = 0,
@@ -604,7 +566,7 @@ h3u.h3aero.new = function(carIndex, isPhysics)
     }
     obj.isLutiniKeysWing = {}
     for kIniKeysWing, vIniKeysWing in pairs(iniKeysWing) do
-        local indexStart = string.regfind(kIniKeysWing, '(LUT_(AOA|GH)_(CL|CD))|(H3_LUT((1|2)_AOA|_SWEEP)_(CL|CD))')
+        local indexStart = string.regfind(kIniKeysWing, '(LUT_(AOA|GH)_(CL|CD))|(H3_LUT_(AOA|SWEEP))_(CL|CD)')
         obj.isLutiniKeysWing[kIniKeysWing] = (indexStart ~= nil)
     end
 
@@ -613,10 +575,6 @@ h3u.h3aero.new = function(carIndex, isPhysics)
     obj.clGain = {}
     obj.cdGain = {}
     obj.sweepAngle = {}
-    obj.lutMix = {}
-    obj.cForce = {}
-    obj.force = {}
-    obj.torque = {}
     obj.iniWings = {}
     for iWing = 0, 1024 do
         local section = 'WING_'..iWing
@@ -643,6 +601,10 @@ h3u.h3aero.new = function(carIndex, isPhysics)
                 obj.iniWings[iWing][kIniKeysWing] = h3u.getLut(obj.iniWings[iWing][kIniKeysWing], obj.carIndex)
             else
             end
+            -- if (kIniKeysWing == 'H3_LUT_AOA_CL') then
+            --     ac.warn('----')
+            --     ac.error(name, kIniKeysWing, obj.iniWings[iWing][kIniKeysWing])
+            -- end
         end
         if (type(obj.iniWings[iWing].POSITION) == 'table') then
             if (#obj.iniWings[iWing].POSITION == 3) then
@@ -653,14 +615,12 @@ h3u.h3aero.new = function(carIndex, isPhysics)
         obj.clGain[iWing] = 1
         obj.cdGain[iWing] = 1
         obj.sweepAngle[iWing] = obj.iniWings[iWing].H3_SWEEP_ANGLE_OFFSET
-        obj.cForce[iWing] = vec3()
-        obj.force[iWing] = vec3()
-        obj.torque[iWing] = vec3()
     end
+    -- obj.a[0] = 0
     
     obj.update = function(self, airDensity, trueAirSpeedMS, soundSpeedMS)
-        self.forceCogExt = vec3()
-        self.torqueExt = vec3()
+        self.forceCogTotal = vec3()
+        self.torqueTotal = vec3()
         local mach = trueAirSpeedMS/soundSpeedMS
         local machGainBase = 1*h3u.softplus(3*(10*mach - 8))
 
@@ -670,70 +630,46 @@ h3u.h3aero.new = function(carIndex, isPhysics)
             local aspectR = tblWingIni.SPAN/tblWingIni.CHORD
             local machClGain = 1/(1 + machGainBase*tblWingIni.H3_MACH_CL_GAIN)
             local machCdGain = (1 + machGainBase*tblWingIni.H3_MACH_CD_GAIN)
-            
-            self.lutMix[iWingIni] = tonumber(ac.load(string.format('car%d.h3aero.lutMix.wing%d', self.carIndex, iWingIni)) or 0)
-            -- ac.warn(tblWingIni.NAME, self.lutMix[iWingIni])
-            local aoaVehicle = vec2(carWing.aoa - carWing.angle, carWing.yawAngle)
-            local aoaWing = h3u.rotateVec2(aoaVehicle, -math.rad(tblWingIni.H3_DIHEDRAL_ANGLE)) + vec2(carWing.angle, -self.sweepAngle[iWingIni])
-            local clAoaMix = math.lerp(h3u.calcLut(tblWingIni.H3_LUT1_AOA_CL, aoaWing.x), h3u.calcLut(tblWingIni.H3_LUT2_AOA_CL, aoaWing.x), self.lutMix[iWingIni])
-            local cdAoaMix = math.lerp(h3u.calcLut(tblWingIni.H3_LUT1_AOA_CD, aoaWing.x), h3u.calcLut(tblWingIni.H3_LUT2_AOA_CD, aoaWing.x), self.lutMix[iWingIni])
 
+            local aoaVehicle = vec2(carWing.aoa - carWing.angle, carWing.yawAngle)
+            local aoaWing = h3u.rotateVec2(aoaVehicle, -math.rad(tblWingIni.H3_DIHEDRAL_ANGLE)) + vec2(carWing.angle, self.sweepAngle[iWingIni])
             local cForceWing = vec3()
             cForceWing.x = 0
             local clYaw = h3u.calcLut(tblWingIni.H3_LUT_SWEEP_CL, aoaWing.y)
-            cForceWing.y = self.clGain[iWingIni]*machClGain*clAoaMix*clYaw
-            -- ac.warn(tblWingIni.NAME, 'cl', cForceWing.y)
+            cForceWing.y = machClGain*h3u.calcLut(tblWingIni.H3_LUT_AOA_CL, aoaWing.x)*clYaw
             local cdYaw = h3u.calcLut(tblWingIni.H3_LUT_SWEEP_CD, aoaWing.y)*math.lerp(tblWingIni.SPAN, tblWingIni.CHORD, math.sin(math.rad(aoaWing.y)))/tblWingIni.SPAN
-            local cdInduced = tblWingIni.H3_INDUCED_DRAG_GAIN*(cForceWing.y^2)/(aspectR*(airDensity*(trueAirSpeedMS^2) + 0.001))
-            -- ac.warn(tblWingIni.NAME, 'cdInduced', cdInduced)
-            cForceWing.z = self.cdGain[iWingIni]*machCdGain*(cdInduced + cdAoaMix*math.lerp(cdYaw, 1, math.sin(math.rad(aoaWing.x))))
-            -- ac.warn(tblWingIni.NAME, 'cd', cForceWing.z)
+            local cdInduced = tblWingIni.H3_INDUCED_DRAG_GAIN*(cForceWing.y^2)/(aspectR*(airDensity*(trueAirSpeedMS^2) + 1))
+            ac.error(tblWingIni.NAME, 'cdInduced', cdInduced)
+            cForceWing.z = (cdInduced + 1)*machCdGain*h3u.calcLut(tblWingIni.H3_LUT_AOA_CD, aoaWing.x)*math.lerp(cdYaw, 1, math.sin(math.rad(aoaWing.x)))
 
             local cForceVehicle = cForceWing:rotate(quat.fromAngleAxis(math.rad(tblWingIni.H3_DIHEDRAL_ANGLE), vec3(0, 0, 1)))
-            self.cForce[iWingIni] = cForceVehicle
-            self.clGain[iWingIni] = cForceVehicle.y
-            self.cdGain[iWingIni] = cForceVehicle.z
+            self.clGain[iWingIni] = self.clGain[iWingIni]*cForceVehicle.y
+            self.cdGain[iWingIni] = self.cdGain[iWingIni]*cForceVehicle.z
 
-            local forceVehicle = 0.5*airDensity*(trueAirSpeedMS^2)*area*cForceVehicle
-            self.force[iWingIni] = forceVehicle
-            -- ac.warn(tblWingIni.NAME, forceVehicleE.x)
-            local forceVehicleE = vec3(1, 0, 0)*forceVehicle
-            self.forceCogExt = self.forceCogExt + forceVehicleE
-
+            local forceVehicle = 0.5*airDensity*(trueAirSpeedMS^2)*area*vec3(1, 0, 0)*cForceVehicle
+            -- ac.error(tblWingIni.NAME, cForceVehicle.x)
+            
+            self.forceCogTotal = self.forceCogTotal + forceVehicle
             local torque = vec3()
             torque.x = tblWingIni.POSITION.y*forceVehicle.z + tblWingIni.POSITION.z*forceVehicle.y
             torque.y = tblWingIni.POSITION.x*forceVehicle.z + tblWingIni.POSITION.z*forceVehicle.x
-            torque.z = tblWingIni.POSITION.y*forceVehicle.x + tblWingIni.POSITION.x*forceVehicle.y
-            self.torque[iWingIni] = torque
-            
-            local torqueE = vec3()
-            torqueE.x = 0
-            torqueE.y = tblWingIni.POSITION.z*forceVehicleE.x
-            torqueE.z = tblWingIni.POSITION.y*forceVehicleE.x
-            self.torqueExt = self.torqueExt + torqueE
+            torque.z = tblWingIni.POSITION.y*forceVehicle.z + tblWingIni.POSITION.x*forceVehicle.y
+            self.torqueTotal = self.torqueTotal + torque
             if (self.isPhysics) then
                 h3u.setWingGainSafe(iWingIni, self.cdGain[iWingIni], self.clGain[iWingIni])
             end
             self.clGain[iWingIni] = 1
             self.cdGain[iWingIni] = 1
         end
-        -- ac.warn('force', self.forces[10] + self.forces[11])
-        -- ac.log('torque', self.torques[10] + self.torques[11])
-
-        self.forceCogExt = self.forceCogExt--/#self.iniWings
-        self.torqueExt = self.torqueExt--/#self.iniWings
-        ac.error('forceCogExt', self.forceCogExt)
-        ac.error('torqueExt', self.torqueExt)
+        self.forceCogTotal = self.forceCogTotal--/#self.iniWings
+        self.torqueTotal = self.torqueTotal--/#self.iniWings
         if (self.isPhysics) then
-            h3u.addForceSafe(vec3(), true, self.forceCogExt, true)
-            h3u.addTorqueSafe(self.torqueExt, true)
+            ac.error('forceCogTotal', self.forceCogTotal)
+            ac.error('torqueTotal', self.torqueTotal)
+            h3u.addForceSafe(vec3(), true, self.forceCogTotal, true)
+            h3u.addTorqueSafe(self.torqueTotal, true)
         end
         return self
-    end
-    
-    
-    obj.setLutMix = function(self, wingIndex, lutMix)
-        ac.store(string.format('car%d.h3aero.lutMix.wing%d', self.carIndex, wingIndex), lutMix)
     end
     return obj
 end
@@ -1802,12 +1738,12 @@ h3u.digTimer.new = function(interval, init)
     local obj = {}
     obj.timer = init
     obj.update = function(self, dt)
-        self.isTrig = (self.timer == 0)
         if (self.timer >= interval) then
             self.timer = 0
         else
             self.timer = self.timer + dt
         end
+        self.isTrig = (self.timer == 0)
         return self.isTrig
     end
     return obj
@@ -1950,12 +1886,8 @@ h3u.PIDcontroller.new = function(kp, ki, kd, init_out)
     obj.ki = ki
     obj.kd = kd
     obj.susi = 1
-    obj.setKParams = function(self, kp, ki, kd)
-        self.kp = kp or self.kp
-        self.ki = ki or self.ki
-        self.kd = kd or self.kd
-        return self
-    end
+    obj.i_dn = nil
+    obj.i_up = nil
     obj.setISustain = function(self, sustain_I)
         self.susi = sustain_I
         return self
@@ -1970,11 +1902,6 @@ h3u.PIDcontroller.new = function(kp, ki, kd, init_out)
         self.i_upLim = upLimit
         return self
     end
-    obj.setDDeadzone = function(self, down, up)
-        self.d_dnDead = down
-        self.d_upDead = up
-        return self
-    end
     obj.setOutClamp = function(self, downLimit, upLimit)
         self.out_dnLim = downLimit
         self.out_upLim = upLimit
@@ -1983,33 +1910,22 @@ h3u.PIDcontroller.new = function(kp, ki, kd, init_out)
     obj.update = function(self, valCurrent, valTgt, dt)
         self.diff = valTgt - valCurrent
         self.p = self.kp*self.diff
-        local i_cand = self.ki*self.diff + self.susi*self.i
+        local i_cand = self.ki*self.diff + dt*self.susi*self.i
         i_cand = math.clamp(i_cand, self.i_dnLim or i_cand, self.i_upLim or i_cand)
         self.i = h3u.rateLimit(self.i, i_cand, (self.i_upRate) and self.i_upRate/self.ki, (self.i_dnRate) and self.i_dnRate/self.ki, dt)
-        self.d = h3u.deadZone(self.kd*self.diff - self.d, self.d_upDead or 0, self.d_dnDead or 0, self.d_upDead or 0, self.d_dnDead or 0)
+        self.d = dt*self.kd*self.diff - self.d
         local out_cand = self.p + self.i - self.d
         self.output = math.clamp(out_cand, self.out_dnLim or out_cand, self.out_upLim or out_cand)
         return self.output
     end
     obj.updatePID = obj.update
-    obj.updatePI_D = function(self, valCurrent, valTgt, dt)
-        self.diff = valTgt - valCurrent
-        self.p = self.kp*self.diff
-        local i_cand = self.ki*self.diff + self.susi*self.i
-        i_cand = math.clamp(i_cand, self.i_dnLim or i_cand, self.i_upLim or i_cand)
-        self.i = h3u.rateLimit(self.i, i_cand, (self.i_upRate) and self.i_upRate/self.ki, (self.i_dnRate) and self.i_dnRate/self.ki, dt)
-        self.d = h3u.deadZone(self.kd*valCurrent - self.d, self.d_upDead or 0, self.d_dnDead or 0, self.d_upDead or 0, self.d_dnDead or 0)
-        local out_cand = self.i - (self.p + self.d)
-        self.output = math.clamp(out_cand, self.out_dnLim or out_cand, self.out_upLim or out_cand)
-        return self.output
-    end
     obj.updateI_PD = function(self, valCurrent, valTgt, dt)
         self.diff = valTgt - valCurrent
-        self.p = self.kp*valCurrent
-        local i_cand = self.ki*self.diff + self.susi*self.i
+        self.p = self.kp*self.diff
+        local i_cand = self.ki*valCurrent + dt*self.susi*self.i
         i_cand = math.clamp(i_cand, self.i_dnLim or i_cand, self.i_upLim or i_cand)
         self.i = h3u.rateLimit(self.i, i_cand, (self.i_upRate) and self.i_upRate/self.ki, (self.i_dnRate) and self.i_dnRate/self.ki, dt)
-        self.d = h3u.deadZone(self.kd*valCurrent - self.d, self.d_upDead or 0, self.d_dnDead or 0, self.d_upDead or 0, self.d_dnDead or 0)
+        self.d = dt*self.kd*valCurrent - self.d
         local out_cand = self.i - (self.p + self.d)
         self.output = math.clamp(out_cand, self.out_dnLim or out_cand, self.out_upLim or out_cand)
         return self.output
